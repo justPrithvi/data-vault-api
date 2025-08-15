@@ -29,10 +29,7 @@ export class AuthController {
   // 4. Sign in
   @Post('signin')
   async signIn(@Body() body: { email: string; password: string }) {
-    const { email, password } = body;
-    console.log(email, password);
-    
+    const { email, password } = body;    
     return this.authService.signIn(email, password);
- 
   }
 }

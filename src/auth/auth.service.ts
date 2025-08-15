@@ -24,7 +24,7 @@ export class AuthService {
     // 1a. Create user in Cognito with temporary password
     const cognitoResponse = await this.awsService.cognito.send(
       new SignUpCommand({
-        ClientId: process.env.COGNITO_CLIENT_ID || '4gamvra2c4hadqtmv57s83f3er', // App client ID (no secret) for user pool
+        ClientId: process.env.COGNITO_CLIENT_ID,
         Username: email,
         Password: password,
         UserAttributes: [
@@ -46,7 +46,7 @@ export class AuthService {
   async confirmSignUp(email: string, code: string) {
     await this.awsService.cognito.send(
       new ConfirmSignUpCommand({
-        ClientId: process.env.COGNITO_CLIENT_ID || '4gamvra2c4hadqtmv57s83f3er',
+        ClientId: process.env.COGNITO_CLIENT_ID ,
         ConfirmationCode: code,
         Username: email,
       }),
@@ -70,8 +70,8 @@ export class AuthService {
   async signIn(email: string, password: string) {
     const result = await this.awsService.cognito.send(
       new AdminInitiateAuthCommand({
-        UserPoolId: process.env.COGNITO_USER_POOL_ID || 'eu-north-1_dWNBeQfUG',
-        ClientId: process.env.COGNITO_CLIENT_ID || '4gamvra2c4hadqtmv57s83f3er',
+        UserPoolId: process.env.COGNITO_USER_POOL_ID,
+        ClientId: process.env.COGNITO_CLIENT_ID,
         AuthFlow: AuthFlowType.ADMIN_USER_PASSWORD_AUTH,
         AuthParameters: { USERNAME: email, PASSWORD: password },
       }),
