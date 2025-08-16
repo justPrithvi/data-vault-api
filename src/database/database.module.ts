@@ -10,7 +10,7 @@ import { TypeOrmModule } from "@nestjs/typeorm";
       imports: [ConfigModule], // <-- needed so useFactory sees ConfigService
       inject: [ConfigService],
       useFactory: (config: ConfigService) => ({
-        type: 'mysql',
+        type: 'postgres',
         host: config.get<string>('DB_HOST'),
         port: config.get<number>('DB_PORT'),
         username: config.get<string>('DB_USERNAME'),
@@ -18,6 +18,11 @@ import { TypeOrmModule } from "@nestjs/typeorm";
         database: config.get<string>('DB_DATABASE'),
         autoLoadEntities: true,
         synchronize: true,
+        extra: {
+          ssl: {
+            rejectUnauthorized: false,
+          }
+        }
       }),
     }),
   ],
