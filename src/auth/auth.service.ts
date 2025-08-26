@@ -76,8 +76,6 @@ export class AuthService {
         AuthParameters: { USERNAME: email, PASSWORD: password },
       }),
     );
-
-    console.log(result);
     
     return {
       accessToken: result.AuthenticationResult?.AccessToken,

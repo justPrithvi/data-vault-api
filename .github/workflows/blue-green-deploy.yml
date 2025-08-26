@@ -1,0 +1,72 @@
+name: Blue-Green Deploy Data Vault UI
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      # Step 1: Checkout repository
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      # Step 2: Setup Terraform
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v2
+        with:
+          terraform_version: 1.6.0
+
+      # Step 3: Configure AWS credentials
+      - name: Configure AWS
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+
+      # Step 4: Initialize Terraform
+      - name: Terraform Init
+        run: terraform init
+
+      # Step 5: Plan and Apply Terraform (create Green environment)
+      - name: Terraform Apply
+        run: terraform apply -auto-approve -var "current_tg_arn=${{ secrets.BLUE_TG_ARN }}"
+
+      # Step 6: Deploy app to Green EC2 instances
+      - name: Setup SSH Key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+
+      - name: Deploy to Green Instances
+        run: |
+          IPS=($(terraform output -raw green_instance_ips | tr -d '[]" ' | tr ',' ' '))
+          for IP in "${IPS[@]}"; do
+            ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa ubuntu@$IP "
+              cd data-vault-ui &&
+              git pull origin main &&
+              npm install &&
+              npm run build &&
+              pm2 restart ecosystem.config.js
+            "
+          done
+
+      # Step 7: Switch ALB listener from Blue → Green
+      - name: Switch Traffic to Green
+        run: |
+          GREEN_TG=$(terraform output -raw green_target_group_arn)
+          BLUE_LISTENER_ARN="${{ secrets.BLUE_LISTENER_ARN }}"
+          aws elbv2 modify-listener \
+            --listener-arn $BLUE_LISTENER_ARN \
+            --default-actions Type=forward,TargetGroupArn=$GREEN_TG
+
+      # Step 8: Delete old Blue environment (optional)
+      - name: Destroy old Blue
+        run: |
+          terraform destroy -target=aws_lb_target_group.blue_tg -auto-approve
+          terraform destroy -target=aws_instance.blue -auto-approve

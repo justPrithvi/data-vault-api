@@ -6,6 +6,8 @@ import { ConfigModule } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AwsModule } from './aws/aws.module';
 import { AuthModule } from './auth/auth.module';
+import CommonModule from './common/common.module';
+import { DocumentModule } from './document/document.module';
 
 @Module({
   imports: [
@@ -17,7 +19,9 @@ import { AuthModule } from './auth/auth.module';
 
     DataBaseModule,
     AwsModule,
-    AuthModule
+    AuthModule,
+    CommonModule,
+    DocumentModule
   ],
   controllers: [AppController],
   providers: [AppService],
