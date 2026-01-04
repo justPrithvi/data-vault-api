@@ -1,37 +1,35 @@
-import {
-  Injectable,
-  CanActivate,
-  ExecutionContext,
-  UnauthorizedException,
-} from '@nestjs/common';
-import { AwsService } from 'src/aws/aws.service';
-import { GetUserCommand } from '@aws-sdk/client-cognito-identity-provider';
+import { Injectable, ExecutionContext, UnauthorizedException } from '@nestjs/common';
+import { AuthGuard } from '@nestjs/passport';
 
 @Injectable()
-export class CognitoAuthGuard implements CanActivate {
-  constructor(private readonly awsService: AwsService) {}
-
-  async canActivate(context: ExecutionContext): Promise<boolean> {
-    const req = context.switchToHttp().getRequest();
-    const authHeader = req.headers['authorization'];
-
-    if (!authHeader) throw new UnauthorizedException('No token found');
-    const token = authHeader.replace('Bearer ', '');
-
-    try {
-      const result = await this.awsService.cognito.send(
-        new GetUserCommand({
-          AccessToken: token,
-        }),
-      );
-
-      // Attach user info to request
-      
-      req.user = result;
-      return true;
-    } catch (err) {
-      
-      throw new UnauthorizedException('Invalid or expired token');
+export class JwtAuthGuard extends AuthGuard('jwt') {
+  canActivate(context: ExecutionContext) {
+    const request = context.switchToHttp().getRequest();
+    const authHeader = request.headers.authorization;
+    
+    console.log('🛡️ JwtAuthGuard triggered');
+    console.log('📨 Authorization header:', authHeader ? `${authHeader.substring(0, 20)}...` : 'MISSING');
+    
+    if (!authHeader) {
+      console.log('❌ No Authorization header found');
+      throw new UnauthorizedException('No token provided');
     }
+    
+    return super.canActivate(context);
+  }
+  
+  handleRequest(err, user, info) {
+    console.log('🔍 handleRequest called');
+    console.log('   err:', err);
+    console.log('   user:', user);
+    console.log('   info:', info);
+    
+    if (err || !user) {
+      console.log('❌ Authentication failed');
+      throw err || new UnauthorizedException();
+    }
+    
+    console.log('✅ Guard passed, user authenticated');
+    return user;
   }
 }

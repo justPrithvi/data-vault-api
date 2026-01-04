@@ -1,86 +1,80 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, UnauthorizedException, ConflictException } from '@nestjs/common';
+import { JwtService } from '@nestjs/jwt';
 import { UserRepository } from '../repository/user.repository';
-import { AwsService } from '../aws/aws.service';
-import {
-  AdminCreateUserCommand,
-  AdminSetUserPasswordCommand,
-  AdminInitiateAuthCommand,
-  AdminConfirmSignUpCommand,
-  AuthFlowType,
-  SignUpCommand,
-  ConfirmSignUpCommand,
-} from '@aws-sdk/client-cognito-identity-provider';
+import * as bcrypt from 'bcrypt';
 
 @Injectable()
 export class AuthService {
   constructor(
     private userRepository: UserRepository,
-    private awsService: AwsService,
+    private jwtService: JwtService,
   ) {}
 
-  // Step 1: Signup user
+  // Signup user
   async signUp(username: string, email: string, password: string) {
-    
-    // 1a. Create user in Cognito with temporary password
-    const cognitoResponse = await this.awsService.cognito.send(
-      new SignUpCommand({
-        ClientId: process.env.COGNITO_CLIENT_ID,
-        Username: email,
-        Password: password,
-        UserAttributes: [
-          { Name: 'name', Value: username },
-          { Name: 'email', Value: email },
-        ],
-      }),
-    );
+    // Check if user already exists
+    const existingUser = await this.userRepository.findByEmail(email);
+    if (existingUser) {
+      throw new ConflictException('User with this email already exists');
+    }
 
-    
-    // 1b. Save user in your DB
+    // Hash password
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    // Save user in DB
     const dbUser = await this.userRepository.createAndSave({
       email,
       name: username,
+      password: hashedPassword,
     });
-  }
 
-  // Step 2: Confirm signup code (from email/SMS)
-  async confirmSignUp(email: string, code: string) {
-    await this.awsService.cognito.send(
-      new ConfirmSignUpCommand({
-        ClientId: process.env.COGNITO_CLIENT_ID ,
-        ConfirmationCode: code,
-        Username: email,
-      }),
-    );
-    // now user is confirmed in Cognito
-  }
-
-  // Step 3: Set permanent password (optional)
-  async setPermanentPassword(username: string, password: string) {
-    await this.awsService.cognito.send(
-      new AdminSetUserPasswordCommand({
-        UserPoolId: process.env.COGNITO_USER_POOL_ID,
-        Username: username,
-        Password: password,
-        Permanent: true,
-      }),
-    );
-  }
-
-  // Step 4: Sign in
-  async signIn(email: string, password: string) {
-    const result = await this.awsService.cognito.send(
-      new AdminInitiateAuthCommand({
-        UserPoolId: process.env.COGNITO_USER_POOL_ID,
-        ClientId: process.env.COGNITO_CLIENT_ID,
-        AuthFlow: AuthFlowType.ADMIN_USER_PASSWORD_AUTH,
-        AuthParameters: { USERNAME: email, PASSWORD: password },
-      }),
-    );
+    // Generate JWT token
+    const payload = { email: dbUser.email, sub: dbUser.id };
+    const accessToken = this.jwtService.sign(payload);
     
+    console.log('🔐 Token created for signup:', { email: dbUser.email, userId: dbUser.id });
+    console.log('🔑 Using JWT_SECRET:', process.env.JWT_SECRET || 'default-secret');
+
     return {
-      accessToken: result.AuthenticationResult?.AccessToken,
-      idToken: result.AuthenticationResult?.IdToken,
-      refreshToken: result.AuthenticationResult?.RefreshToken,
+      accessToken,
+      user: {
+        id: dbUser.id,
+        email: dbUser.email,
+        name: dbUser.name,
+        isAdmin: dbUser.isAdmin || false,
+      },
+      message: 'User registered successfully',
+    };
+  }
+
+  // Sign in
+  async signIn(email: string, password: string) {
+    const dbUser = await this.userRepository.findByEmail(email);
+    if (!dbUser) {
+      throw new UnauthorizedException('Invalid credentials');
+    }
+
+    // Verify password
+    const isPasswordValid = await bcrypt.compare(password, dbUser.password);
+    if (!isPasswordValid) {
+      throw new UnauthorizedException('Invalid credentials');
+    }
+
+    // Generate JWT token
+    const payload = { email: dbUser.email, sub: dbUser.id };
+    const accessToken = this.jwtService.sign(payload);
+    
+    console.log('🔐 Token created for signin:', { email: dbUser.email, userId: dbUser.id });
+    console.log('🔑 Using JWT_SECRET:', process.env.JWT_SECRET || 'default-secret');
+
+    return {
+      accessToken,
+      user: {
+        id: dbUser.id,
+        email: dbUser.email,
+        name: dbUser.name,
+        isAdmin: dbUser.isAdmin || false,
+      },
     };
   }
 }

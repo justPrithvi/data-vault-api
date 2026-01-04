@@ -14,6 +14,12 @@ export class User {
   @Column({ nullable: true })
   phoneNumber?: string;
 
+  @Column()
+  password: string;
+
+  @Column({ default: false })
+  isAdmin: boolean;
+
   @CreateDateColumn()
   createdAt: Date;
 

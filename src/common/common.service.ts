@@ -15,8 +15,8 @@ export default class CommonService {
         return await this.tagsRepo.getTags()
     }
 
-    async updateTag(id: number, body: { tag: string }) {
-        return this.tagsRepo.updateTag(id, body.tag);
+    async updateTag(id: number, tag: string) {
+        return this.tagsRepo.updateTag(id, tag);
     }
 
     async deleteTag(id: number) {

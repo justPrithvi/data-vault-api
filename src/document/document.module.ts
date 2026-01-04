@@ -1,12 +1,15 @@
 import { Module } from "@nestjs/common";
 import { DocumentController } from "./document.controller";
 import { DocumentService } from "./document.service";
-import { AwsModule } from "src/aws/aws.module";
 import { AuthModule } from "src/auth/auth.module";
+import { DocumentsRepository } from "src/repository/document.repository";
+import { TypeOrmModule } from "@nestjs/typeorm";
+import { Documents } from "src/entities/documents.entity";
+import { Tags } from "src/entities/tags.entities";
 
 @Module({
-  imports: [AwsModule, AuthModule],
+  imports: [AuthModule, TypeOrmModule.forFeature([Documents, Tags])],
   controllers: [DocumentController],
-  providers: [DocumentService],
+  providers: [DocumentService, DocumentsRepository],
 })
 export class DocumentModule {}
