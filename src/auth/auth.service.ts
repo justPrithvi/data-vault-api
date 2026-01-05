@@ -31,9 +31,6 @@ export class AuthService {
     // Generate JWT token
     const payload = { email: dbUser.email, sub: dbUser.id };
     const accessToken = this.jwtService.sign(payload);
-    
-    console.log('🔐 Token created for signup:', { email: dbUser.email, userId: dbUser.id });
-    console.log('🔑 Using JWT_SECRET:', process.env.JWT_SECRET || 'default-secret');
 
     return {
       accessToken,
@@ -63,9 +60,6 @@ export class AuthService {
     // Generate JWT token
     const payload = { email: dbUser.email, sub: dbUser.id };
     const accessToken = this.jwtService.sign(payload);
-    
-    console.log('🔐 Token created for signin:', { email: dbUser.email, userId: dbUser.id });
-    console.log('🔑 Using JWT_SECRET:', process.env.JWT_SECRET || 'default-secret');
 
     return {
       accessToken,

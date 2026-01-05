@@ -1,5 +1,6 @@
-import { Body, Controller, Post } from '@nestjs/common';
+import { Body, Controller, Post, Get, UseGuards, Request } from '@nestjs/common';
 import { AuthService } from './auth.service';
+import { JwtAuthGuard } from './jwt-auth.guard';
 
 @Controller('auth')
 export class AuthController {
@@ -17,5 +18,17 @@ export class AuthController {
   async signIn(@Body() body: { email: string; password: string }) {
     const { email, password } = body;    
     return this.authService.signIn(email, password);
+  }
+
+  // Validate token - for Python service to call
+  @Get('validate')
+  @UseGuards(JwtAuthGuard)
+  async validateToken(@Request() req) {
+    // If we reach here, the token is valid (JwtAuthGuard passed)
+    // req.user is populated by JwtStrategy.validate()
+    return {
+      valid: true,
+      user: req.user,
+    };
   }
 }
