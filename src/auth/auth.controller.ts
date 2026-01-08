@@ -1,9 +1,11 @@
-import { Body, Controller, Post, Get, UseGuards, Request } from '@nestjs/common';
+import { Body, Controller, Post, Get, UseGuards, Request, Logger } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { JwtAuthGuard } from './jwt-auth.guard';
 
 @Controller('auth')
 export class AuthController {
+  private readonly logger = new Logger(AuthController.name);
+  
   constructor(private authService: AuthService) {}
 
   // Signup
@@ -24,6 +26,9 @@ export class AuthController {
   @Get('validate')
   @UseGuards(JwtAuthGuard)
   async validateToken(@Request() req) {
+    // Log every token validation request
+    this.logger.log(`Token validation triggered for user: ${req.user?.email || 'unknown'} (ID: ${req.user?.sub || 'unknown'})`);
+    
     // If we reach here, the token is valid (JwtAuthGuard passed)
     // req.user is populated by JwtStrategy.validate()
     return {
