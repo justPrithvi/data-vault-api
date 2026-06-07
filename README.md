@@ -1,99 +1,114 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+# DataVault Backend (`data-vault-api`)
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+A NestJS web server that provides user authentication via JWT tokens, database storage mapping with TypeORM, and file persistence on local storage.
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://coveralls.io/github/nestjs/nest?branch=master" target="_blank"><img src="https://coveralls.io/repos/github/nestjs/nest/badge.svg?branch=master#9" alt="Coverage" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+---
 
-## Description
-
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
-
-## Project setup
+## 🏗️ Codebase Structure
 
 ```bash
-$ npm install
+data-vault-api/
+├── dist/                    # Compiled JavaScript files (built output)
+├── uploads/                 # Storage directory where uploaded documents are stored
+├── test/                    # End-to-end (e2e) tests folder
+│
+├── src/
+│   ├── main.ts              # Entry point setting up CORS, prefixing paths, and starting NestJS
+│   ├── app.module.ts        # Roots modules: Database configuration, Auth routing, Document modules
+│   ├── app.controller.ts    # Base health-check controllers
+│   ├── app.service.ts       # Base business logic helpers
+│   │
+│   ├── auth/                # 🔐 Authentication Module
+│   │   ├── auth.module.ts   # Passport, JwtModule, and User dependency registrations
+│   │   ├── auth.controller.ts # Signup, Signin, and Token Validation routes
+│   │   ├── auth.service.ts  # Logic for bcrypt password hashing, login, and signing JWTs
+│   │   ├── jwt.strategy.ts  # passport-jwt strategy for validating signature and user profile
+│   │   ├── jwt-auth.guard.ts # Guard that protects controllers via request authorization headers
+│   │   └── admin.guard.ts   # Check if user has administrative rights
+│   │
+│   ├── document/            # 📁 Document Upload & Retrieval Module
+│   │   ├── document.module.ts # Document controller, service, and DB repositories
+│   │   ├── document.controller.ts # File upload handling (Multer) & download routes
+│   │   ├── document.service.ts # Upload validation, size parsing, and DB commits
+│   │   └── dto/             # Data Transfer Objects for validation
+│   │
+│   ├── entities/            # 🗄️ Database Models (TypeORM Schemas)
+│   │   ├── user.entity.ts   # User profile schema (email, name, hashed password, isAdmin)
+│   │   ├── documents.entity.ts # Document catalog schema (fileName, size, localPath, user_id)
+│   │   └── tags.entities.ts # Categories/Tags schema (many-to-many relationship with documents)
+│   │
+│   ├── repository/          # Custom DB Access Layer (Abstraction on TypeORM)
+│   │   ├── user.repository.ts # Custom user queries (findByEmail, findById)
+│   │   ├── document.repository.ts # Pagination, text search query building
+│   │   └── tags.repository.ts # Fetch all, delete, or create categorizations
+│   │
+│   ├── database/            # Database config
+│   │   └── database.module.ts # Dynamic TypeORM Postgres setup
+│   │
+│   ├── aws/                 # Preserved AWS interfaces (Cognito / S3 integrations)
+│   └── common/              # Global decorators, exceptions, and filters
+│
+├── package.json             # Core dependencies and launch scripts
+├── tsconfig.json            # TypeScript settings
+└── ecosystem.config.js      # Production deployment config for PM2 process manager
 ```
 
-## Compile and run the project
+---
 
-```bash
-# development
-$ npm run start
+## 🛠️ REST API Endpoints
 
-# watch mode
-$ npm run start:dev
+### 🔐 Authentication (`/auth`)
+* **`POST /auth/signup`**: Registers a new user. Hashes the password with `bcrypt` (10 rounds), saves the user profile to Postgres, and returns a JWT access token.
+* **`POST /auth/signin`**: Validates credentials against user passwords in the DB. Returns a signed JWT access token on success.
+* **`GET /auth/validate`** *(Protected by JWT)*: Loops back validation requests. Used by the Python microservice to verify client headers. Returns the validated user profile (`{ id, email, name, isAdmin }`).
 
-# production mode
-$ npm run start:prod
+### 📁 Documents (`/documents`)
+* **`POST /documents/upload`** *(Protected by JWT)*: Processes a single file upload using a Multer disk storage engine interceptor, placing files into `./uploads`. Registers the document metadata and tag mappings in the database.
+* **`GET /documents/:email`** *(Protected by JWT)*: Fetches catalog records for a specific user. Supports pagination (`?page=1&limit=10`) and textual search query filtering.
+* **`GET /documents/download/:id`** *(Protected by JWT)*: Direct download stream endpoint that returns the requested file located in the `./uploads` directory.
+
+---
+
+## ⚙️ Configuration & Environment Variables
+
+Define a `.env` file in the root of the `data-vault-api/` directory:
+
+```env
+# Server Configuration
+APP_PORT=5001
+
+# Security Cryptography Secrets
+JWT_SECRET=your_secret_key
+JWT_REFRESH_SECRET=your_refresh_secret
+
+# Database Settings
+DB_TYPE=postgres
+DB_HOST=localhost
+DB_PORT=5432
+DB_USERNAME=your_postgres_username
+DB_PASSWORD=your_postgres_password
+DB_DATABASE=data_vault
 ```
 
-## Run tests
+---
 
-```bash
-# unit tests
-$ npm run test
+## 🚀 Getting Started
 
-# e2e tests
-$ npm run test:e2e
-
-# test coverage
-$ npm run test:cov
-```
-
-## Deployment
-
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
-
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
-
-```bash
-$ npm install -g mau
-$ mau deploy
-```
-
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
-
-## Resources
-
-Check out a few resources that may come in handy when working with NestJS:
-
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
-
-## Support
-
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
-
-## Stay in touch
-
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
-
-## License
-
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+1. **Prerequisite:** PostgreSQL must be running, and you need a database named `data_vault`:
+   ```sql
+   CREATE DATABASE data_vault;
+   ```
+2. Navigate to the API folder and install dependencies:
+   ```bash
+   cd data-vault-api
+   npm install
+   ```
+3. Initialize the destination upload directory:
+   ```bash
+   mkdir -p uploads
+   ```
+4. Run the NestJS server in watch mode:
+   ```bash
+   npm run start:dev
+   ```
+5. The API will be available at `http://localhost:5001`.
